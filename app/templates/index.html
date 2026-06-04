@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Manager – DevOps V&amp;V</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<header>
+    <h1>Task Manager</h1>
+    <p>Gestión de tareas para equipos de trabajo</p>
+</header>
+
+<main>
+    <!-- Nueva tarea -->
+    <section class="card create-section">
+        <h2>Nueva Tarea</h2>
+        <form id="task-form" novalidate>
+            <input  type="text" id="task-title"
+                    placeholder="Título de la tarea *" autocomplete="off" required>
+            <textarea id="task-description"
+                      placeholder="Descripción (opcional)"></textarea>
+            <select id="task-status">
+                <option value="pending">⏳ Pendiente</option>
+                <option value="in_progress">🔄 En Progreso</option>
+                <option value="completed">✅ Completada</option>
+            </select>
+            <button type="submit" class="btn-primary">+ Crear Tarea</button>
+        </form>
+    </section>
+
+    <!-- Estadísticas -->
+    <div id="stats-bar" class="stats-bar"></div>
+
+    <!-- Filtros -->
+    <div class="filters">
+        <button class="filter-btn active" data-status="">Todas</button>
+        <button class="filter-btn" data-status="pending">Pendientes</button>
+        <button class="filter-btn" data-status="in_progress">En Progreso</button>
+        <button class="filter-btn" data-status="completed">Completadas</button>
+    </div>
+
+    <!-- Listado -->
+    <section id="tasks-container"></section>
+</main>
+
+<!-- Modal de edición -->
+<div id="edit-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-content">
+        <h2>Editar Tarea</h2>
+        <input type="hidden" id="edit-id">
+        <input type="text"   id="edit-title"       placeholder="Título *">
+        <textarea            id="edit-description" placeholder="Descripción"></textarea>
+        <select              id="edit-status">
+            <option value="pending">⏳ Pendiente</option>
+            <option value="in_progress">🔄 En Progreso</option>
+            <option value="completed">✅ Completada</option>
+        </select>
+        <div class="modal-buttons">
+            <button id="save-btn"   class="btn-primary">Guardar</button>
+            <button id="cancel-btn" class="btn-secondary">Cancelar</button>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

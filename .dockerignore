@@ -1,0 +1,48 @@
+# Control de versiones
+.git
+.gitignore
+
+# Entornos virtuales Python
+.venv
+venv
+env
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Archivos de pruebas y cobertura
+tests/
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+*.egg-info
+
+# Base de datos local (solo para dev local sin Docker)
+*.db
+*.sqlite
+*.sqlite3
+
+# Variables de entorno locales
+.env
+.env.local
+
+# Editores e IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Documentación y assets no necesarios en imagen
+docs/
+*.md
+README*
+
+# Scripts (no necesarios dentro del contenedor)
+scripts/
+
+# Artefactos de CI
+.github/

@@ -1,0 +1,12 @@
+[flake8]
+max-line-length = 120
+exclude =
+    .venv,
+    __pycache__,
+    .git,
+    .pytest_cache,
+    infra,
+    scripts
+# W503: salto de línea antes de operador binario (preferencia de estilo)
+# E203: espacios antes de ':' (compatible con black)
+ignore = W503,E203

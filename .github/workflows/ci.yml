@@ -1,0 +1,200 @@
+name: CI – Task Manager
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+    branches: [ "main", "develop" ]
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: "3.13"
+  IMAGE_NAME: task-manager
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# ─────────────────────────────────────────────────────────────────────────────
+jobs:
+# ─────────────────────────────────────────────────────────────────────────────
+
+  # ── 1. Lint ────────────────────────────────────────────────────────────────
+  lint:
+    name: Lint (flake8)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip -q
+          pip install -r requirements.txt -q
+
+      - name: Run flake8
+        run: |
+          python -m flake8 app/
+
+  # ── 2. Test ────────────────────────────────────────────────────────────────
+  test:
+    name: Unit & Integration Tests
+    runs-on: ubuntu-latest
+    needs: lint
+
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip -q
+          pip install -r requirements.txt -q
+
+      - name: Run test suite
+        env:
+          APP_ENV: test
+          DATABASE_PATH: /tmp/taskmanager_ci_${{ matrix.python-version }}.db
+        run: |
+          python -m pytest tests/test_tasks.py tests/test_infra.py \
+            --tb=short -v \
+            --junitxml=test-results-${{ matrix.python-version }}.xml
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.python-version }}
+          path: test-results-${{ matrix.python-version }}.xml
+          retention-days: 7
+
+  # ── 3. Docker build ────────────────────────────────────────────────────────
+  docker-build:
+    name: Docker Build & Healthcheck
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: ${{ env.IMAGE_NAME }}:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          load: true
+
+      - name: Run container and verify healthcheck
+        run: |
+          docker run -d \
+            --name taskmanager-ci \
+            -p 5000:5000 \
+            -e DATABASE_PATH=/tmp/taskmanager.db \
+            -e DEBUG=false \
+            ${{ env.IMAGE_NAME }}:ci
+
+          echo "Esperando que el contenedor levante..."
+          for i in $(seq 1 12); do
+            STATUS=$(docker inspect --format='{{.State.Health.Status}}' taskmanager-ci 2>/dev/null || echo "starting")
+            echo "  Intento $i/12: $STATUS"
+            if [ "$STATUS" = "healthy" ]; then
+              echo "Contenedor saludable."
+              break
+            fi
+            sleep 5
+          done
+
+          docker inspect --format='{{.State.Health.Status}}' taskmanager-ci | grep -q "healthy"
+
+      - name: Smoke test /api/health
+        run: |
+          curl -sf http://localhost:5000/api/health | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          assert data.get('status') == 'ok', f'Estado inesperado: {data}'
+          print('Smoke test OK:', data)
+          "
+
+      - name: Collect container logs on failure
+        if: failure()
+        run: docker logs taskmanager-ci
+
+      - name: Stop container
+        if: always()
+        run: docker rm -f taskmanager-ci || true
+
+  # ── 4. Security scan ───────────────────────────────────────────────────────
+  security:
+    name: Security Scan (pip-audit)
+    runs-on: ubuntu-latest
+    needs: lint
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install pip-audit
+        run: pip install pip-audit -q
+
+      - name: Audit dependencies
+        run: |
+          pip-audit -r requirements.txt --skip-editable
+
+  # ── 5. Summary (badge) ─────────────────────────────────────────────────────
+  ci-summary:
+    name: CI Summary
+    runs-on: ubuntu-latest
+    needs: [lint, test, docker-build, security]
+    if: always()
+
+    steps:
+      - name: Check all jobs passed
+        env:
+          LINT:    ${{ needs.lint.result }}
+          TEST:    ${{ needs.test.result }}
+          DOCKER:  ${{ needs.docker-build.result }}
+          SECURITY: ${{ needs.security.result }}
+        run: |
+          echo "lint:     $LINT"
+          echo "test:     $TEST"
+          echo "docker:   $DOCKER"
+          echo "security: $SECURITY"
+
+          if [[ "$LINT" == "success" && "$TEST" == "success" && \
+                "$DOCKER" == "success" ]]; then
+            echo "CI PASSED"
+            exit 0
+          else
+            echo "CI FAILED"
+            exit 1
+          fi

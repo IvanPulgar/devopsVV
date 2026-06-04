@@ -1,0 +1,42 @@
+# Entornos virtuales
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Bases de datos locales
+*.db
+*.sqlite
+*.sqlite3
+
+# Variables de entorno específicas (los .env.* del proyecto SÍ se versionan)
+.env
+.env.local
+
+# Cobertura de pruebas
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
+
+# Editores e IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+
+# Docker (imágenes construidas no se versionen; los archivos de config sí)
